@@ -5,6 +5,7 @@ const app = express();
 const cors = require('cors');
 const porta = process.env.PORT || 3000;
 const mysql = require('mysql');
+const jwt = require('jsonwebtoken');
 
 
 app.use(express.json());
@@ -27,14 +28,42 @@ db.connect((err, connect)=>{
 
 })
 
-app.post('/PostTasks', (req, res)=>{
+
+
+function verifytoken(req, res, next) {
+    const auth = req.headers.authorization; // corrigido
+
+    if (!auth) {
+        return res.status(401).json({ err: 'Token necessário' });
+    }
+
+    const token = auth.split(' ')[1]; // Bearer TOKEN
+
+    jwt.verify(token, process.env.segredo, (err, decoded) => {
+        if (err) {
+            return res.status(401).json({ err: 'Token inválido ou expirado' });
+        }
+
+        req.userId = decoded.id; // salva o id do usuário no request
+        console.log(decoded); // payload do token
+        next(); // passa para a próxima função
+    });
+}
+
+
+function gerarToken(user) {
+    return jwt.sign({ id: user.id, name: user.name, email: user.email }, process.env.segredo , { expiresIn: '8h' });
+}
+
+
+app.post('/PostTasks', verifytoken ,(req, res)=>{
 
     const { tarefa } = req.body;
 
-    sql = 'INSERT INTO tarefas (titulo) VALUES (?)'
+    sql = 'INSERT INTO tarefas (titulo, user_id) VALUES (?, ?)'
 
     
-    db.query(sql, [tarefa], (err, results)=>{
+    db.query(sql, [tarefa, req.userId], (err, results)=>{
         const documents = results;
 
         if(err){
@@ -49,24 +78,35 @@ app.post('/PostTasks', (req, res)=>{
     });
 });
 
-app.get("/getTasks", (req, res)=>{
-
-    const sql = 'SELECT * FROM tarefas ORDER BY id DESC';
-
-    db.query(sql, (err, results)=>{
-        if(err){
-            return res.status(401).send("error on mysql");
+app.get("/getTasks", (req, res) => {
+    const sql = 'SELECT * FROM tarefas WHERE user_id = ? ORDER BY id DESC';
+    const auth = req.headers.authorization;
+    
+    if (!auth) {
+        return res.status(401).json({ ok: false, message: 'Token necessário' });
+    }
+    
+    const token = auth.split(' ')[1];
+    
+    jwt.verify(token, process.env.segredo, (err, decoded) => {
+        if (err) {
+            return res.status(401).json({ ok: false, message: 'Token inválido ou expirado' });
         }
-
-        if(results.length === 0){
-          return  res.status(402).send("deu erro");
-        }
-
-        res.status(200).json({ task: results})
-
-    })
-
-})
+    
+        const userId = decoded.id;
+    
+        db.query(sql, [userId], (err, results) => {
+            if (err) {
+                console.error(err);
+                return res.status(500).json({ ok: false, message: 'Erro no MySQL' });
+            }
+    
+            // Sempre retornar tasks como array
+            res.status(200).json({ ok: true, tasks: results || [] });
+        });
+    });
+    
+});
 
 app.put('/finishTasks/:id', (req, res) => {
     const id = req.params.id;
@@ -110,6 +150,77 @@ app.delete('/deleteTasks/:id', (req, res)=>{
 
     })
 })
+
+
+app.post('/register', (req, res)=>{
+
+    const {email, senha, name} = req.body;
+
+    const sql = 'INSERT INTO users (name, email, password) VALUES (?, ?, ?)';
+
+    db.query(sql, [name, email, senha], (err, results)=>{
+   
+        if(err){
+            console.log(err);
+            return res.status(401).json({err: err})
+        };
+
+        console.log(results)
+            
+            const sql2 = 'SELECT * FROM users WHERE email = ? AND password = ?';
+
+            db.query(sql2, [email, senha], (err, results)=>{
+                if (err){
+                    console.log(err);
+                    return res.status(405).json({err: err});
+                }
+
+                console.log(results)
+
+                const documents = results[0];
+
+               const token = gerarToken(documents);
+
+                res.status(201).json({token: token});
+
+        })
+
+        
+    })
+
+})
+
+app.post('/login', (req, res)=>{
+
+    const {email, senha} = req.body;
+
+    const sql = 'SELECT * FROM users WHERE email = ? AND password = ?';
+
+   
+
+    db.query(sql, [email, senha], (err, results)=>{
+
+        if(err){
+            console.log(err);
+            return res.status(401).json({err: err})
+        };
+
+        const comments = results[0];
+        
+      const token = gerarToken(comments);
+
+        return res.status(201).json({token: token})
+
+        console.log(results)
+
+    })
+
+
+
+})
+    
+
+
 
 
 

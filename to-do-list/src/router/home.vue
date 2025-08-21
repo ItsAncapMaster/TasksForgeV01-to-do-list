@@ -54,10 +54,16 @@ function modalClose(){
 
 function showMensagens() {
   lista.value = []; 
-  fetch('http://localhost:8090/getTasks')
+  const token = localStorage.getItem('token');
+  fetch('http://localhost:8090/getTasks', {
+    method: 'GET',
+    headers: {
+      'Authorization': `Bearer ${token}`
+    }
+  })
     .then(res => res.json())
     .then(data => {
-      data.task.forEach(element => {
+      data.tasks.forEach(element => {
         lista.value.push(element);
       });
     })
@@ -69,11 +75,17 @@ showMensagens();
 
 function CreateTask() {
      // isso deve estar fora da função se for reativo no Vue
+ const token = localStorage.getItem('token')
+
+ if(!token){
+  $router.push('/login');
+ }
 
     fetch('http://localhost:8090/PostTasks', {
         method: 'POST',
         headers: {
-            'Content-Type': 'application/json'
+            'Content-Type': 'application/json',
+            'Authorization': `Bearer ${token}`
         },
         body: JSON.stringify({ tarefa: tarefa.value })
     })
