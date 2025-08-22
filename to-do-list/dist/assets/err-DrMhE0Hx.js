@@ -1,0 +1,1 @@
+import{_ as t,c as n,a as r,f as a,h as s,g as l,F as _,o as c,b as f}from"./index-BFsE8FqP.js";const u={};function d(m,e){const o=l("router-link");return c(),n(_,null,[e[1]||(e[1]=r("h1",null,"404 page not found",-1)),a(o,{to:"/"},{default:s(()=>e[0]||(e[0]=[f("Go to Home",-1)])),_:1,__:[0]})],64)}const i=t(u,[["render",d]]);export{i as default};
